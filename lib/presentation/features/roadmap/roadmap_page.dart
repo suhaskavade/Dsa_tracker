@@ -1,36 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dsa_tracker/core/theme/app_colors.dart';
-import 'package:dsa_tracker/core/utils/data_seeder.dart';
+import 'package:dsa_tracker/presentation/providers/question_providers.dart';
+import 'package:dsa_tracker/presentation/providers/stats_providers.dart';
 
-class RoadmapPage extends StatelessWidget {
+class RoadmapPage extends ConsumerWidget {
   const RoadmapPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final groupedQuestions = ref.watch(topicGroupedQuestionsProvider).valueOrNull ?? {};
+    final topics = groupedQuestions.keys.toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('DSA Learning Roadmap')),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(24.0),
-        itemCount: DataSeeder.topics.length,
-        itemBuilder: (context, index) {
-          final topic = DataSeeder.topics[index];
-          // Mock data: first 3 unlocked, others locked
-          final isUnlocked = index <= 2;
-          final progress = isUnlocked ? (index == 2 ? 0.4 : 1.0) : 0.0;
+      body: topics.isEmpty 
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            padding: const EdgeInsets.all(24.0),
+            itemCount: topics.length,
+            itemBuilder: (context, index) {
+              final topic = topics[index];
+              final progress = ref.watch(topicProgressProvider(topic));
+              
+              // Unlock logic: First topic always unlocked, 
+              // others unlocked if previous topic has > 0 progress
+              bool isUnlocked = true;
+              if (index > 0) {
+                final prevTopic = topics[index - 1];
+                final prevProgress = ref.watch(topicProgressProvider(prevTopic));
+                isUnlocked = prevProgress > 0.0;
+              }
 
-          return _RoadmapCard(
-            topic: topic,
-            step: index + 1,
-            isUnlocked: isUnlocked,
-            progress: progress,
-          );
-        },
-      ),
+              return _RoadmapCard(
+                topic: topic,
+                step: index + 1,
+                isUnlocked: isUnlocked,
+                progress: progress,
+              );
+            },
+          ),
     );
   }
 }
 
-class _RoadmapCard extends StatelessWidget {
+class _RoadmapCard extends ConsumerWidget {
   final String topic;
   final int step;
   final bool isUnlocked;
@@ -44,7 +59,7 @@ class _RoadmapCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: isUnlocked
@@ -90,7 +105,9 @@ class _RoadmapCard extends StatelessWidget {
         trailing: isUnlocked
             ? FilledButton(
                 onPressed: () {
-                  // TODO: Navigate to questions filtered by topic
+                  // Navigate to questions filtered by topic
+                  ref.read(searchQueryProvider.notifier).state = topic;
+                  context.go('/questions');
                 },
                 child: Text(progress == 1.0 ? 'Review' : 'Start'),
               )

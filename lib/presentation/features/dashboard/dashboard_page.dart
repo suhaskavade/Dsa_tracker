@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:dsa_tracker/core/theme/app_colors.dart';
+import 'package:dsa_tracker/presentation/providers/stats_providers.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
       body: SingleChildScrollView(
@@ -34,17 +36,22 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class _StatsRow extends StatelessWidget {
+class _StatsRow extends ConsumerWidget {
   const _StatsRow();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final totalSolved = ref.watch(totalSolvedProvider);
+    final pendingRevision = ref.watch(pendingRevisionProvider);
+    // TODO: implement streak logic properly, for now simulated to 0
+    final currentStreak = 0; 
+
     return Row(
       children: [
         Expanded(
           child: _StatCard(
             title: 'Total Solved',
-            value: '142',
+            value: totalSolved.toString(),
             icon: Icons.check_circle,
             color: AppColors.success,
           ),
@@ -53,7 +60,7 @@ class _StatsRow extends StatelessWidget {
         Expanded(
           child: _StatCard(
             title: 'Current Streak',
-            value: '12 Days',
+            value: '$currentStreak Days',
             icon: Icons.local_fire_department,
             color: Colors.orange,
           ),
@@ -62,7 +69,7 @@ class _StatsRow extends StatelessWidget {
         Expanded(
           child: _StatCard(
             title: 'Pending Revision',
-            value: '8',
+            value: pendingRevision.toString(),
             icon: Icons.refresh,
             color: AppColors.warning,
           ),
@@ -121,11 +128,17 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _PatternMasteryChart extends StatelessWidget {
+class _PatternMasteryChart extends ConsumerWidget {
   const _PatternMasteryChart();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mastery = ref.watch(patternMasteryProvider);
+
+    if (mastery.isEmpty) {
+      return const Center(child: Text("Start solving to see your mastery chart!"));
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -140,20 +153,16 @@ class _PatternMasteryChart extends StatelessWidget {
                 sideTitles: SideTitles(
                   showTitles: true,
                   getTitlesWidget: (value, meta) {
-                    const titles = [
-                      'Arrays',
-                      'Strings',
-                      'Sorting',
-                      'Two Ptrs',
-                      'Sliding Win',
-                      'Binary Search',
-                    ];
-                    if (value.toInt() < titles.length) {
+                    if (value.toInt() < mastery.length) {
+                      String title = mastery[value.toInt()].key;
+                      // Abbreviate long titles
+                      if (title.length > 10) title = title.substring(0, 10) + '..';
                       return Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
-                          titles[value.toInt()],
+                          title,
                           style: const TextStyle(fontSize: 10),
+                          textAlign: TextAlign.center,
                         ),
                       );
                     }
@@ -169,14 +178,9 @@ class _PatternMasteryChart extends StatelessWidget {
             ),
             gridData: FlGridData(show: false),
             borderData: FlBorderData(show: false),
-            barGroups: [
-              _buildBar(0, 80),
-              _buildBar(1, 60),
-              _buildBar(2, 40),
-              _buildBar(3, 90),
-              _buildBar(4, 30),
-              _buildBar(5, 70),
-            ],
+            barGroups: mastery.asMap().entries.map((entry) {
+              return _buildBar(entry.key, entry.value.value);
+            }).toList(),
           ),
         ),
       ),
